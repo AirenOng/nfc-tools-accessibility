@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Accessible Navigation</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            text-align: center;
+            font-size: 1.2em;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            margin: 20px;
+            cursor: pointer;
+        }
+        video {
+            width: 90vw;
+            max-width: 400px;
+            height: auto;
+            border: 2px solid #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Navigation for the Visually Impaired</h1>
+    <p>Press the button and say a command (e.g., "What is in front of me?")</p>
+    <button onclick="startListening()">Start Voice Recognition</button>
+    <p id="output"></p>
+    <video id="camera" autoplay playsinline></video>
+    
+    <script>
+        async function loadModel() {
+            return await cocoSsd.load();
+        }
+
+        async function detectObjects() {
+            const model = await loadModel();
+            const video = document.getElementById('camera');
+            const predictions = await model.detect(video);
+
+            if (predictions.length > 0) {
+                let objectsDetected = predictions.map(p => `${p.class} at approximately ${(1 / p.score).toFixed(1)} meters`).join(", ");
+                document.getElementById('output').textContent = `Detected: ${objectsDetected}`;
+                speak(`I see ${objectsDetected}`);
+            } else {
+                document.getElementById('output').textContent = "No objects detected.";
+                speak("I see nothing specific in front of you.");
+            }
+        }
+
+        function speak(text) {
+            const speech = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(speech);
+        }
+
+        function startListening() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const command = event.results[0][0].transcript.toLowerCase();
+                document.getElementById('output').textContent = `You said: "${command}"`;
+                processCommand(command);
+            };
+        }
+
+        function processCommand(command) {
+            if (command.includes("what is in front of me")) {
+                speak("Analyzing your surroundings...");
+                detectObjects();
+            } else {
+                speak("Command not recognized.");
+            }
+        }
+
+        // Start camera feed
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                document.getElementById('camera').srcObject = stream;
+            })
+            .catch(error => console.error("Camera access denied", error));
+    </script>
+</body>
+</html>
